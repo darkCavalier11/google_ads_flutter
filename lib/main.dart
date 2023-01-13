@@ -1,7 +1,23 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
 
+import 'package:async_redux/async_redux.dart';
+import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+
+import 'ad_state.dart';
+
+late Store<AdState> store;
 void main() {
-  runApp(const MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  final initFuture = MobileAds.instance.initialize();
+  final adState = AdState(initializationStatus: initFuture);
+  store = Store(initialState: adState);
+  runApp(
+    StoreProvider<AdState>(
+      store: store,
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -27,6 +43,26 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  BannerAd? bannerAd;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final adState = store.state;
+    adState.initializationStatus.then((status) {
+      setState(() {
+        bannerAd = BannerAd(
+          size: AdSize.banner,
+          adUnitId: AdState.bannerAdUnit,
+          // todo: configure for listening to ad state
+          listener: const BannerAdListener(),
+          // todo: configure an ad request from server for an ad
+          request: const AdRequest(),
+        )..load();
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -41,6 +77,14 @@ class _MyHomePageState extends State<MyHomePage> {
                 itemCount: 20,
               ),
             ),
+            if (bannerAd != null)
+              Container(
+                height: 50,
+                color: Colors.white,
+                child: AdWidget(
+                  ad: bannerAd!,
+                ),
+              ),
           ],
         ),
       ),
